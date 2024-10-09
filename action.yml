@@ -64,6 +64,17 @@ runs:
         install: >-
           git
           python
+          mingw-w64-ucrt-x86_64-jq
+          m4
+          mingw-w64-ucrt-x86_64-gcc-libs
+          mingw-w64-ucrt-x86_64-libwinpthread-git
+          bison
+          mingw-w64-ucrt-x86_64-diffutils
+          flex
+          mingw-w64-ucrt-x86_64-gperf
+          mingw-w64-ucrt-x86_64-make
+          mingw-w64-ucrt-x86_64-ninja
+          mingw-w64-ucrt-x86_64-perl
 
     - shell: ${{ runner.os == 'Windows'  && 'msys2 -eo pipefail {0}' || 'bash' }}
       run: git config --global core.autocrlf false
