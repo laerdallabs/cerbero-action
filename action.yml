@@ -59,10 +59,6 @@ runs:
       with:
         msystem: UCRT64
         cache: ${{ inputs.no-cache != 'true' }}
-        install: >-
-          git
-          python
-          make
 
     - shell: ${{ runner.os == 'Windows'  && 'msys2 -eo pipefail {0}' || 'bash' }}
       run: git config --global core.autocrlf false
@@ -91,11 +87,11 @@ runs:
 
     - if: ${{inputs.bootstrap-system == 'true' && runner.os == 'Windows' }}
       name: Bootstrap Windows
-      shell: msys2 -eo pipefail {0}
+      shell: powershell
       working-directory: cerbero
       run: |
         # Bootstrap Windows
-        powershell.exe ./tools/bootstrap-windows.ps1
+        ./tools/bootstrap-windows.ps1
 
     - if: ${{inputs.bootstrap-system == 'true' && runner.os == 'Linux' }}
       name: Bootstrap Linux
