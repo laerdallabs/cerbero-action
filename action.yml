@@ -1,0 +1,272 @@
+name: Build GStreamer with Cerbero (on Windows)
+description: Uses the GStreamer Cerbero build aggregator to build GStreamer (MSI packages) on the local toolchain
+inputs:
+  cerbero-repo:
+    description: 'Repository to use for Cerbero'
+    required: false
+    default: https://gitlab.freedesktop.org/gstreamer/cerbero.git
+  cerbero-ref:
+    description: 'Ref to use for Cerbero'
+    required: false
+    default: main
+  config:
+    description: 'Name of the configuration file to use'
+    required: false
+    default: 'win64.cbc'
+  cerbero-args:
+    description: 'Additional args to pass to Cerbero'
+    required: false
+    default: '--clocktime --timestamps -v visualstudio'
+  cerbero-package-args:
+    description: 'Additional args to pass to Cerbero package'
+    required: false
+    default: ''
+  bootstrap-system:
+    description: 'Whether to bootstrap the system'
+    required: false
+    default: 'false'
+  cleanup:
+    description: 'Whether to clean the Cerbero build directory'
+    required: false
+    default: 'true'
+  no-cache:
+    description: 'Whether to disable restoring from cache'
+    required: false
+    default: 'false'
+outputs:
+  gstreamer-version:
+    description: 'GStreamer version'
+    value: ${{ steps.version-info.outputs.gstreamer-version }}
+  cerbero-short-sha:
+    description: 'Short SHA of the Cerbero checkout'
+    value: ${{ steps.version-info.outputs.cerbero-short-sha }}
+  cerbero-path:
+    description: 'Path to the Cerbero checkout'
+    value: ${{ inputs.cleanup != 'true' && 'cerbero' }}
+  runtime-package-path:
+    description: 'Location of the GStreamer runtime package'
+    value: ${{ steps.build-packages.outputs.runtime-package }}
+  devel-package-path:
+    description: 'Location of the GStreamer development package'
+    value: ${{ steps.build-packages.outputs.dev }}
+runs:
+  using: "composite"
+  steps:
+
+    - id: setup-msys2
+      if: runner.os == 'Windows'
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: UCRT64
+        path-type: inherit
+        release: false
+        cache: ${{ inputs.no-cache != 'true' }}
+        install: >-
+          mingw-w64-ucrt-x86_64-jq
+          m4
+          mingw-w64-ucrt-x86_64-gcc-libs
+          mingw-w64-ucrt-x86_64-libwinpthread-git
+          bison
+          mingw-w64-ucrt-x86_64-diffutils
+          flex
+          mingw-w64-ucrt-x86_64-gperf
+          mingw-w64-ucrt-x86_64-make
+          mingw-w64-ucrt-x86_64-ninja
+          mingw-w64-ucrt-x86_64-perl
+
+    - shell: ${{ runner.os == 'Windows'  && 'msys2 -eo pipefail {0}' || 'bash' }}
+      run: git config --global core.autocrlf false
+
+    - id: get-cerbero
+      shell: ${{ runner.os == 'Windows'  && 'msys2 -eo pipefail {0}' || 'bash' }}
+      name: Get Cerbero
+      run: |
+        git clone --depth=1 --branch ${{ inputs.cerbero-ref }} ${{ inputs.cerbero-repo }} cerbero
+
+    - id: version-info
+      shell: ${{ runner.os == 'Windows'  && 'msys2 -eo pipefail {0}' || 'bash' }}
+      working-directory: cerbero
+      env:
+        CI_PROJECT_NAME: cerbero
+      run: |
+        # Get GStreamer/cerbero version info and installer filenames
+        gstreamer_version=$(./cerbero-uninstalled packageinfo gstreamer-1.0 | awk '/Version:/ {print $2}')
+        echo "gstreamer-version=${gstreamer_version}" | tee -a $GITHUB_OUTPUT
+
+        cerbero_short_sha=$(git -C cerbero rev-parse --short HEAD)
+        echo "cerbero-short-sha=${cerbero_short_sha}" | tee -a $GITHUB_OUTPUT
+
+        echo "runtime-msi-filename=gstreamer-1.0-msvc-x86_64-${gstreamer_version}-${cerbero_short_sha}.msi" | tee -a $GITHUB_OUTPUT
+        echo "dev-msi-filename=gstreamer-1.0-devel-msvc-x86_64-${gstreamer_version}-${cerbero_short_sha}.msi" | tee -a $GITHUB_OUTPUT
+
+    - if: ${{inputs.bootstrap-system == 'true' && runner.os == 'Windows' }}
+      name: Bootstrap Windows
+      shell: msys2 -eo pipefail {0}
+      working-directory: cerbero
+      run: |
+        # Bootstrap Windows
+        powershell.exe ./tools/bootstrap-windows.ps1
+
+    - if: ${{inputs.bootstrap-system == 'true' && runner.os == 'Linux' }}
+      name: Bootstrap Linux
+      shell: bash
+      working-directory: cerbero
+      run: |
+        # Bootstrap Linux
+        ./tools/bootstrap-debian.sh
+
+    - id: cerbero-config
+      working-directory: cerbero
+      shell: ${{ runner.os == 'Windows'  && 'msys2 -eo pipefail {0}' || 'bash' }}
+      env:
+        CERBERO_PATH: cerbero
+        CERBERO_HOME: cerbero-build
+        CERBERO_SOURCES: cerbero-sources
+        CERBERO: "./cerbero-uninstalled -c config/${{ inputs.config }} -c localconf.cbc"
+        CERBERO_ARGS: ${{ inputs.cerbero-args }}
+        CERBERO_PACKAGE_ARGS: ${{ inputs.cerbero-package-args }}
+        CERBERO_PACKAGE_ORIGIN: ${{ steps.version-info.outputs.gstreamer-version }}-${{ steps.version-info.outputs.cerbero-short-sha }}
+      run: |
+        # Set up Cerbero configuration
+        echo "cerbero-sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
+        echo "cerbero-home=${CERBERO_PATH}\\${CERBERO_HOME}" >> $GITHUB_OUTPUT
+        echo "cerbero-sources=${CERBERO_PATH}\\${CERBERO_SOURCES}" >> $GITHUB_OUTPUT
+        echo "full-log-path=$(cygpath -au .)/${CERBERO_HOME}/logs" >> $GITHUB_OUTPUT
+
+        pwd_native=$(cygpath -am .)
+        echo "home_dir = \"${pwd_native}/${CERBERO_HOME}\"" > localconf.cbc
+        echo "local_sources = \"${pwd_native}/${CERBERO_SOURCES}\"" >> localconf.cbc
+        echo "vs_install_version = \"vs17\"" >> localconf.cbc
+        echo "num_of_cpus = ${NUMBER_OF_PROCESSORS}" >> localconf.cbc
+        echo "package_origin = \"${CERBERO_PACKAGE_ORIGIN}\"" >> localconf.cbc
+        cat localconf.cbc
+
+        git clean -xdf -e localconf.cbc -e "${CERBERO_SOURCES}"
+
+        echo "CERBERO=${CERBERO}" >> $GITHUB_ENV
+        echo "CERBERO_ARGS=${CERBERO_ARGS}" >> $GITHUB_ENV
+        echo "CERBERO_PACKAGE_ARGS=${CERBERO_PACKAGE_ARGS}" >> $GITHUB_ENV
+
+        config_hash=$(echo "${CERBERO_ARGS}${{ inputs.config }}" | sha256sum | cut -d' ' -f1)
+        echo "config-hash=${config_hash}" >> $GITHUB_OUTPUT
+
+    - id: restore-cerbero-sources-cache
+      if: ${{ inputs.no-cache != 'true' }}
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ steps.cerbero-config.outputs.cerbero-sources }}
+        key: |
+          cerbero-sources-${{ steps.version-info.outputs.gstreamer-version }}-${{ steps.cerbero-config.outputs.cerbero-sha }}
+        restore-keys: |
+          cerbero-sources-${{ steps.version-info.outputs.gstreamer-version }}-
+          cerbero-sources-
+
+    - id: restore-cerbero-deps-cache
+      if: ${{ inputs.no-cache != 'true' }}
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ steps.cerbero-config.outputs.cerbero-home }}/cerbero-deps.tar.xz
+        key: |
+          ${{ runner.os }}-cerbero-deps-${{ steps.version-info.outputs.gstreamer-version }}-${{ steps.cerbero-config.outputs.cerbero-sha }}-${{ steps.cerbero-config.outputs.config-hash }}-${{ runner.name }}
+        restore-keys: |
+          ${{ runner.os }}-cerbero-deps-${{ steps.version-info.outputs.gstreamer-version }}-${{ steps.cerbero-config.outputs.cerbero-sha }}-${{ steps.cerbero-config.outputs.config-hash }}-
+
+    - if: ${{ steps.restore-cerbero-deps-cache.outputs.cache-matched-key }}
+      shell: ${{ runner.os == 'Windows'  && 'msys2 -eo pipefail {0}' || 'bash' }}
+      run: |
+        # Restore Cerbero dependencies
+        deps_file='${{ steps.cerbero-config.outputs.cerbero-home }}/cerbero-deps.tar.xz'
+
+        if [ ! -f "$deps_file" ]; then
+          exit 0
+        fi
+
+        echo "::group::Unpacking Cerbero Deps"
+        tar -xJf "${deps_file}" -C '${{ steps.cerbero-config.outputs.cerbero-home }}'
+        rm -f "${deps_file}"
+        ls -l '${{ steps.cerbero-config.outputs.cerbero-home }}'
+        echo "::endgroup::"
+
+    - id: bootstrap-cerbero
+      working-directory: cerbero
+      shell: ${{ runner.os == 'Windows'  && 'msys2 -eo pipefail {0}' || 'bash' }}
+      env:
+        CI_PROJECT_NAME: cerbero
+        LOG_PATH: ${{ steps.cerbero-config.outputs.full-log-path }}
+        FETCH_ARGS: --jobs=4
+      run: |
+        # Bootstrap Cerbero
+        mkdir -p "${LOG_PATH}"
+
+        group_cmd () {
+          echo "::group::$1"
+          eval $1
+          echo "::endgroup::"
+        }
+
+        group_cmd "pacman -Q" | tee "${LOG_PATH}/0_pacman.log"
+
+        # Build deps for all gstreamer recipes and any recipes that build gstreamer
+        # plugins (and hence compile against gstreamer)
+        build_deps="gstreamer-1.0 gst-plugins-base-1.0 gst-plugins-good-1.0
+            gst-plugins-bad-1.0 gst-plugins-ugly-1.0 gst-rtsp-server-1.0
+            gst-devtools-1.0 gst-editing-services-1.0 libnice gst-plugins-rs
+            gst-libav-1.0"
+        more_deps="glib-networking pkg-config"
+
+        group_cmd "$CERBERO $CERBERO_ARGS show-config" | tee "${LOG_PATH}/1_config.log"
+        group_cmd "$CERBERO $CERBERO_ARGS fetch-bootstrap $FETCH_ARGS" | tee "${LOG_PATH}/2_bootstrap.log"
+        group_cmd "$CERBERO $CERBERO_ARGS fetch-package $FETCH_ARGS --deps gstreamer-1.0" | tee -a "${LOG_PATH}/2_bootstrap.log"
+        group_cmd "$CERBERO $CERBERO_ARGS bootstrap --offline --system=no" | tee -a "${LOG_PATH}/2_bootstrap.log"
+        group_cmd "$CERBERO $CERBERO_ARGS build-deps --offline $build_deps" | tee "${LOG_PATH}/3_build-deps.log"
+        group_cmd "$CERBERO $CERBERO_ARGS build --offline $more_deps" | tee -a "${LOG_PATH}/3_build-deps.log"
+        group_cmd "$CERBERO $CERBERO_ARGS gen-cache" | tee "${LOG_PATH}/4_cache.log"
+
+    - if: ${{ steps.bootstrap-cerbero.outcome == 'success' && ! steps.restore-cerbero-sources-cache.outputs.cache-hit }}
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ steps.cerbero-config.outputs.cerbero-sources }}
+        key: ${{ steps.restore-cerbero-sources-cache.outputs.cache-primary-key }}
+
+    - if: ${{ steps.bootstrap-cerbero.outcome == 'success' && ! steps.restore-cerbero-deps-cache.outputs.cache-hit }}
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ steps.cerbero-config.outputs.cerbero-home }}/cerbero-deps.tar.xz
+        key: ${{ steps.restore-cerbero-deps-cache.outputs.cache-primary-key }}
+
+    - id: build-packages
+      working-directory: cerbero
+      shell: ${{ runner.os == 'Windows'  && 'msys2 -eo pipefail {0}' || 'bash' }}
+      env:
+        CI_PROJECT_NAME: cerbero
+        LOG_PATH: ${{ steps.cerbero-config.outputs.full-log-path }}
+      run: |
+        mkdir -p "${LOG_PATH}"
+        cmd="$CERBERO $CERBERO_ARGS package --offline ${CERBERO_PACKAGE_ARGS} -o \"$(cygpath -am .)\" gstreamer-1.0"
+        echo "::group::$cmd"
+        eval $cmd | tee "${LOG_PATH}/package.log"
+        echo "::endgroup::"
+
+        find ~+ -maxdepth 1 -name 'gstreamer-1.0-msvc*.msi' -exec sh -c 'echo runtime-msi=$(cygpath -aw "{}") >> $GITHUB_OUTPUT' \;
+        find ~+ -maxdepth 1 -name 'gstreamer-1.0-devel*.msi' -exec sh -c 'echo dev-msi=$(cygpath -aw "{}") >> $GITHUB_OUTPUT' \;
+
+    - uses: actions/upload-artifact@v4
+      if: ${{ steps.build-packages.outputs.runtime-msi || steps.build-packages.outputs.dev-msi }}
+      with:
+        name: GStreamer Installers
+        path: |
+          ${{ steps.build-packages.outputs.runtime-msi }}
+          ${{ steps.build-packages.outputs.dev-msi }}
+
+    - name: Upload logs
+      uses: actions/upload-artifact@v4
+      if: ${{ always() && steps.cerbero-config.outcome == 'success' }}
+      with:
+        name: cerbero-logs
+        path: ${{ steps.cerbero-config.outputs.cerbero-home }}/logs
+
+    - name: Cleanup Cerbero
+      if: ${{ always() && inputs.cleanup == 'true' && steps.get-cerbero.outcome != 'skipped' }}
+      shell: ${{ runner.os == 'Windows'  && 'msys2 -eo pipefail {0}' || 'bash' }}
+      run: rm -rf "cerbero"
