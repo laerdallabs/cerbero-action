@@ -62,6 +62,7 @@ runs:
         install: >-
           git
           python
+          make
 
     - shell: ${{ runner.os == 'Windows'  && 'msys2 -eo pipefail {0}' || 'bash' }}
       run: git config --global core.autocrlf false
@@ -202,7 +203,7 @@ runs:
             gst-plugins-bad-1.0 gst-plugins-ugly-1.0 gst-rtsp-server-1.0
             gst-devtools-1.0 gst-editing-services-1.0 libnice gst-plugins-rs
             gst-libav-1.0"
-        more_deps="glib-networking pkg-config"
+        more_deps="glib-networking pkg-config make"
 
         group_cmd "$CERBERO $CERBERO_ARGS show-config" | tee "${LOG_PATH}/1_config.log"
         group_cmd "$CERBERO $CERBERO_ARGS fetch-bootstrap $FETCH_ARGS" | tee "${LOG_PATH}/2_bootstrap.log"
