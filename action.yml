@@ -108,8 +108,7 @@ runs:
           python \
           python-argparse \
           locales \
-          vim \
-        sudo update-alternatives --set editor /usr/bin/vim.basic
+          vim
 
     - id: cerbero-config
       working-directory: cerbero
@@ -140,7 +139,7 @@ runs:
         echo "home_dir = \"${pwd_native}/${CERBERO_HOME}\"" > localconf.cbc
         echo "local_sources = \"${pwd_native}/${CERBERO_SOURCES}\"" >> localconf.cbc
         echo "vs_install_version = \"vs17\"" >> localconf.cbc
-        echo "num_of_cpus = ${NUMBER_OF_PROCESSORS}" >> localconf.cbc
+        echo "num_of_cpus = ${NUMBER_OF_PROCESSORS:-$(nproc --all)}" >> localconf.cbc
         echo "package_origin = \"${CERBERO_PACKAGE_ORIGIN}\"" >> localconf.cbc
         cat localconf.cbc
 
