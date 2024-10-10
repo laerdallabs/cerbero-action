@@ -117,11 +117,17 @@ runs:
         # Set up Cerbero configuration
         echo "cerbero-sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
 
-        echo "cerbero-home=${CERBERO_PATH}\\${CERBERO_HOME}" >> $GITHUB_OUTPUT
-        echo "cerbero-sources=${CERBERO_PATH}\\${CERBERO_SOURCES}" >> $GITHUB_OUTPUT
-        echo "full-log-path=$(cygpath -au .)/${CERBERO_HOME}/logs" >> $GITHUB_OUTPUT
+        echo "cerbero-home=${CERBERO_PATH}/${CERBERO_HOME}" >> $GITHUB_OUTPUT
+        echo "cerbero-sources=${CERBERO_PATH}/${CERBERO_SOURCES}" >> $GITHUB_OUTPUT
 
-        pwd_native=$(cygpath -am .)
+        if [ "${{ runner.os }}" == "Windows" ]; then
+          echo "full-log-path=$(cygpath -au .)/${CERBERO_HOME}/logs" >> $GITHUB_OUTPUT
+          pwd_native=$(cygpath -am .)
+        else
+          echo "full-log-path=$(pwd)/${CERBERO_HOME}/logs" >> $GITHUB_OUTPUT
+          pwd_native=$(pwd)
+        fi
+
         echo "home_dir = \"${pwd_native}/${CERBERO_HOME}\"" > localconf.cbc
         echo "local_sources = \"${pwd_native}/${CERBERO_SOURCES}\"" >> localconf.cbc
         echo "vs_install_version = \"vs17\"" >> localconf.cbc

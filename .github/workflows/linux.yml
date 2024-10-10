@@ -1,0 +1,36 @@
+name: Linux
+
+on:
+  workflow_dispatch:
+    inputs:
+      cerbero-repo:
+        description: 'Repository to use for Cerbero'
+        required: false
+        default: https://gitlab.freedesktop.org/gstreamer/cerbero.git
+      cerbero-ref:
+        description: 'Ref to use for Cerbero'
+        required: false
+        default: main
+      no-cache:
+        description: 'Do not use cache when building'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    name: Build
+    runs-on:
+      group: larger-ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - id: build-gstreamer
+        name: Build GStreamer
+        uses: ./
+        with:
+          cerbero-repo: ${{ inputs.cerbero-repo }}
+          cerbero-ref: ${{ inputs.cerbero-ref }}
+          cerbero-args: --clocktime --timestamps
+          no-cache: ${{ inputs.no-cache == true }}
