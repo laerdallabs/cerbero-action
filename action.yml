@@ -12,7 +12,6 @@ inputs:
   config:
     description: 'Name of the configuration file to use'
     required: false
-    default: 'win64.cbc'
   cerbero-args:
     description: 'Additional args to pass to Cerbero'
     required: false
@@ -117,7 +116,6 @@ runs:
         CERBERO_PATH: cerbero
         CERBERO_HOME: cerbero-build
         CERBERO_SOURCES: cerbero-sources
-        CERBERO: "./cerbero-uninstalled -c config/${{ inputs.config }} -c localconf.cbc"
         CERBERO_ARGS: ${{ inputs.cerbero-args }}
         CERBERO_PACKAGE_ARGS: ${{ inputs.cerbero-package-args }}
         CERBERO_PACKAGE_ORIGIN: ${{ steps.version-info.outputs.gstreamer-version }}-${{ steps.version-info.outputs.cerbero-short-sha }}
@@ -145,7 +143,12 @@ runs:
 
         git clean -xdf -e localconf.cbc -e "${CERBERO_SOURCES}"
 
-        echo "CERBERO=${CERBERO}" >> $GITHUB_ENV
+        cerbero_cmd="./cerbero-uninstalled"
+        if [ -n "${{ inputs.config }}" ]; then
+          cerbero_cmd="${cerbero_cmd} -c config/${{ inputs.config }}"
+        fi
+
+        echo "CERBERO=${cerbero_cmd} -c localconf.cbc" >> $GITHUB_ENV
         echo "CERBERO_ARGS=${CERBERO_ARGS}" >> $GITHUB_ENV
         echo "CERBERO_PACKAGE_ARGS=${CERBERO_PACKAGE_ARGS}" >> $GITHUB_ENV
 
