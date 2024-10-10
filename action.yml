@@ -109,7 +109,6 @@ runs:
           python-argparse \
           locales \
           vim \
-        locale-gen en_GB.UTF-8
         sudo update-alternatives --set editor /usr/bin/vim.basic
 
     - id: cerbero-config
@@ -208,7 +207,9 @@ runs:
           echo "::endgroup::"
         }
 
-        group_cmd "pacman -Q" | tee "${LOG_PATH}/0_pacman.log"
+        if [ "${{ runner.os }}" == "Windows" ]; then
+          group_cmd "pacman -Q" | tee "${LOG_PATH}/0_pacman.log"
+        fi
 
         # Build deps for all gstreamer recipes and any recipes that build gstreamer
         # plugins (and hence compile against gstreamer)
