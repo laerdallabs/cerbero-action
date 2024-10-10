@@ -37,6 +37,5 @@ jobs:
         with:
           cerbero-repo: ${{ inputs.cerbero-repo }}
           cerbero-ref: ${{ inputs.cerbero-ref }}
-          cerbero-args: --clocktime --timestamps
           no-cache: ${{ inputs.no-cache == true }}
           bootstrap-system: ${{ inputs.bootstrap-system }}
