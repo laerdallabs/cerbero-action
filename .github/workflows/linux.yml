@@ -11,6 +11,11 @@ on:
         description: 'Ref to use for Cerbero'
         required: false
         default: main
+      bootstrap-system:
+        description: 'Bootstrap the system before building'
+        required: false
+        type: boolean
+        default: true
       no-cache:
         description: 'Do not use cache when building'
         required: false
@@ -34,3 +39,4 @@ jobs:
           cerbero-ref: ${{ inputs.cerbero-ref }}
           cerbero-args: --clocktime --timestamps
           no-cache: ${{ inputs.no-cache == true }}
+          bootstrap-system: ${{ inputs.bootstrap-system }}
