@@ -24,7 +24,7 @@ inputs:
   bootstrap-system:
     description: 'Whether to bootstrap the system'
     required: false
-    default: 'false'
+    default: 'true'
   cleanup:
     description: 'Whether to clean the Cerbero build directory'
     required: false

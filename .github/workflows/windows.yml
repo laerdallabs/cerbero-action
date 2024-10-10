@@ -34,4 +34,3 @@ jobs:
           cerbero-ref: ${{ inputs.cerbero-ref }}
           cerbero-args: --clocktime --timestamps -v visualstudio
           no-cache: ${{ inputs.no-cache == true }}
-          bootstrap-system: true
