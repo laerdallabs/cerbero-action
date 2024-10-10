@@ -15,7 +15,7 @@ inputs:
   cerbero-args:
     description: 'Additional args to pass to Cerbero'
     required: false
-    default: '--clocktime --timestamps -v visualstudio'
+    default: '--clocktime --timestamps'
   cerbero-package-args:
     description: 'Additional args to pass to Cerbero package'
     required: false
