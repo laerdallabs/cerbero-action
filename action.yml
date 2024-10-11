@@ -59,6 +59,18 @@ runs:
         msystem: UCRT64
         path-type: inherit
         cache: ${{ inputs.no-cache != 'true' }}
+        install: >-
+          mingw-w64-ucrt-x86_64-jq
+          m4
+          mingw-w64-ucrt-x86_64-gcc-libs
+          mingw-w64-ucrt-x86_64-libwinpthread-git
+          bison
+          mingw-w64-ucrt-x86_64-diffutils
+          flex
+          mingw-w64-ucrt-x86_64-gperf
+          mingw-w64-ucrt-x86_64-make
+          mingw-w64-ucrt-x86_64-ninja
+          mingw-w64-ucrt-x86_64-perl
 
     - if: runner.os == 'Windows'
       shell: msys2 -eo pipefail {0}
