@@ -6,11 +6,11 @@ on:
       cerbero-repo:
         description: 'Repository to use for Cerbero'
         required: false
-        default: https://gitlab.freedesktop.org/gstreamer/cerbero.git
+        default: https://github.com/blinemedical/cerbero.git
       cerbero-ref:
         description: 'Ref to use for Cerbero'
         required: false
-        default: main
+        default: fixes-for-cerbero-action
       bootstrap-system:
         description: 'Bootstrap the system before building'
         required: false
