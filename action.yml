@@ -256,7 +256,7 @@ runs:
         fi
 
         echo "::group::$cmd"
-        eval $cmd | tee "${LOG_PATH}/package.log"
+        eval $cmd | tee "${LOG_PATH}/5_package.log"
         echo "::endgroup::"
 
         if [ "${{ runner.os }}" == "Windows" ]; then
