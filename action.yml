@@ -248,13 +248,24 @@ runs:
         LOG_PATH: ${{ steps.cerbero-config.outputs.full-log-path }}
       run: |
         mkdir -p "${LOG_PATH}"
-        cmd="$CERBERO $CERBERO_ARGS package --offline ${CERBERO_PACKAGE_ARGS} -o \"$(cygpath -am .)\" gstreamer-1.0"
+
+        if [ "${{ runner.os }}" == "Windows" ]; then
+          cmd="$CERBERO $CERBERO_ARGS package --offline ${CERBERO_PACKAGE_ARGS} -o \"$(cygpath -am .)\" gstreamer-1.0"
+        else
+          cmd="$CERBERO $CERBERO_ARGS package --offline ${CERBERO_PACKAGE_ARGS} -o \"$(pwd)\" gstreamer-1.0"
+        fi
+
         echo "::group::$cmd"
         eval $cmd | tee "${LOG_PATH}/package.log"
         echo "::endgroup::"
 
-        find ~+ -maxdepth 1 -name 'gstreamer-1.0-msvc*.msi' -exec sh -c 'echo runtime-msi=$(cygpath -aw "{}") >> $GITHUB_OUTPUT' \;
-        find ~+ -maxdepth 1 -name 'gstreamer-1.0-devel*.msi' -exec sh -c 'echo dev-msi=$(cygpath -aw "{}") >> $GITHUB_OUTPUT' \;
+        if [ "${{ runner.os }}" == "Windows" ]; then
+          find ~+ -maxdepth 1 -name 'gstreamer-1.0-msvc*.msi' -exec sh -c 'echo runtime-msi=$(cygpath -aw "{}") >> $GITHUB_OUTPUT' \;
+          find ~+ -maxdepth 1 -name 'gstreamer-1.0-devel*.msi' -exec sh -c 'echo dev-msi=$(cygpath -aw "{}") >> $GITHUB_OUTPUT' \;
+        else
+          find ~+ -maxdepth 1 -name 'gstreamer-1.0-msvc*.msi' -exec sh -c 'echo runtime-msi=$(readlink -f "{}") >> $GITHUB_OUTPUT' \;
+          find ~+ -maxdepth 1 -name 'gstreamer-1.0-devel*.msi' -exec sh -c 'echo dev-msi=$(readlink -f "{}") >> $GITHUB_OUTPUT' \;
+        fi
 
     - uses: actions/upload-artifact@v4
       if: ${{ steps.build-packages.outputs.runtime-msi || steps.build-packages.outputs.dev-msi }}
