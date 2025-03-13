@@ -84,6 +84,15 @@ runs:
         New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force
 
     - if: runner.os == 'Windows'
+      # These are seen in the cerbero-uninstalled.ps1 script as a CLI arg
+      name: Set Extra MSYS2 flags for UCRT64 Environment
+      shell: powershell
+      run: |
+        Add-Content "C:\msys64\ucrt64.ini" "`nCHERE_INVOKING=1"
+        Add-Content "C:\msys64\ucrt64.ini" "`nMSYS2_NOSTART=yes"
+        Add-Content "C:\msys64\ucrt64.ini" "`nMSYS=winsymlinks:nativestrict"
+
+    - if: runner.os == 'Windows'
       name: Set Git 'core.autocrlf = false'
       shell: msys2 -eo pipefail {0}
       run: git config --global core.autocrlf false
