@@ -303,7 +303,3 @@ runs:
         name: cerbero-logs
         path: ${{ steps.cerbero-config.outputs.cerbero-home }}/logs
 
-    - name: Cleanup Cerbero
-      if: ${{ always() && inputs.cleanup == 'true' && steps.get-cerbero.outcome != 'skipped' }}
-      shell: ${{ runner.os == 'Windows'  && 'msys2 -eo pipefail {0}' || 'bash' }}
-      run: rm -rf "cerbero"
