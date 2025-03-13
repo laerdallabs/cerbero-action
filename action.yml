@@ -97,9 +97,8 @@ runs:
       shell: msys2 -eo pipefail {0}
       run: git config --global core.autocrlf false
 
-    - id: get-cerbero
+    - name: Clone Cerbero
       shell: ${{ runner.os == 'Windows'  && 'msys2 -eo pipefail {0}' || 'bash' }}
-      name: Get Cerbero
       run: |
         git clone --depth=1 --branch ${{ inputs.cerbero-ref }} ${{ inputs.cerbero-repo }} cerbero
 
@@ -114,6 +113,7 @@ runs:
         fi
 
     - id: version-info
+      name: Gather Version Information
       shell: ${{ runner.os == 'Windows'  && 'msys2 -eo pipefail {0}' || 'bash' }}
       working-directory: cerbero
       env:
@@ -130,6 +130,7 @@ runs:
         echo "dev-msi-filename=gstreamer-1.0-devel-msvc-x86_64-${gstreamer_version}-${cerbero_short_sha}.msi" | tee -a $GITHUB_OUTPUT
 
     - id: cerbero-config
+      name: Configure Cerbero Build
       working-directory: cerbero
       shell: ${{ runner.os == 'Windows'  && 'msys2 -eo pipefail {0}' || 'bash' }}
       env:
@@ -220,7 +221,7 @@ runs:
         LOG_PATH: ${{ steps.cerbero-config.outputs.full-log-path }}
         FETCH_ARGS: --jobs=4
       run: |
-        # Bootstrap Cerbero
+        # Bootstrap Cerbero Log
         mkdir -p "${LOG_PATH}"
 
         group_cmd () {
