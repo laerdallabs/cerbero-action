@@ -47,6 +47,11 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: Python >= 3.10
+      uses: actions/setup-python@v5
+      with:
+        # cerbero requires >=3.10
+        python-version: '>=3.10'
 
     - id: setup-msys2
       if: runner.os == 'Windows'
