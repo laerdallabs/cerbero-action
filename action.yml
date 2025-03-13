@@ -20,10 +20,6 @@ inputs:
     description: 'Additional args to pass to Cerbero package'
     required: false
     default: ''
-  bootstrap-system:
-    description: 'Bootstrap the system before building'
-    required: false
-    default: 'true'
   cleanup:
     description: 'Whether to clean the Cerbero build directory'
     required: false
@@ -82,6 +78,16 @@ runs:
       run: |
         git clone --depth=1 --branch ${{ inputs.cerbero-ref }} ${{ inputs.cerbero-repo }} cerbero
 
+    - name: Run Bootstrap
+      shell: ${{ runner.os == 'Windows'  && 'msys2 -eo pipefail {0}' || 'bash' }}
+      working-directory: cerbero
+      run: |
+        if [ "${{ runner.os }}" == "Windows" ]; then
+          powershell.exe ./tools/bootstrap-windows.ps1
+        else
+          ./tools/bootstrap-debian.sh
+        fi
+
     - id: version-info
       shell: ${{ runner.os == 'Windows'  && 'msys2 -eo pipefail {0}' || 'bash' }}
       working-directory: cerbero
@@ -97,28 +103,6 @@ runs:
 
         echo "runtime-msi-filename=gstreamer-1.0-msvc-x86_64-${gstreamer_version}-${cerbero_short_sha}.msi" | tee -a $GITHUB_OUTPUT
         echo "dev-msi-filename=gstreamer-1.0-devel-msvc-x86_64-${gstreamer_version}-${cerbero_short_sha}.msi" | tee -a $GITHUB_OUTPUT
-
-    - if: ${{inputs.bootstrap-system == 'true' && runner.os == 'Windows' }}
-      name: Bootstrap Windows
-      shell: powershell
-      working-directory: cerbero
-      run: |
-        # Bootstrap Windows
-        ./tools/bootstrap-windows.ps1
-
-    - if: ${{inputs.bootstrap-system == 'true' && runner.os == 'Linux' }}
-      name: Bootstrap Linux
-      shell: bash
-      working-directory: cerbero
-      run: |
-        # Bootstrap Linux
-        sudo apt-get update
-        sudo apt-get -y install --no-install-recommends \
-          sudo \
-          git \
-          python3 \
-          locales \
-          vim
 
     - id: cerbero-config
       working-directory: cerbero
@@ -203,7 +187,7 @@ runs:
         ls -l '${{ steps.cerbero-config.outputs.cerbero-home }}'
         echo "::endgroup::"
 
-    - id: bootstrap-cerbero
+    - id: cerbero-build
       working-directory: cerbero
       shell: ${{ runner.os == 'Windows'  && 'msys2 -eo pipefail {0}' || 'bash' }}
       env:
@@ -240,13 +224,13 @@ runs:
         group_cmd "$CERBERO $CERBERO_ARGS build --offline $more_deps" | tee -a "${LOG_PATH}/3_build-deps.log"
         group_cmd "$CERBERO $CERBERO_ARGS gen-cache" | tee "${LOG_PATH}/4_cache.log"
 
-    - if: ${{ steps.bootstrap-cerbero.outcome == 'success' && ! steps.restore-cerbero-sources-cache.outputs.cache-hit }}
+    - if: ${{ inputs.no-cache != 'true' && steps.cerbero-build.outcome == 'success' && ! steps.restore-cerbero-sources-cache.outputs.cache-hit }}
       uses: actions/cache/save@v4
       with:
         path: ${{ steps.cerbero-config.outputs.cerbero-sources }}
         key: ${{ steps.restore-cerbero-sources-cache.outputs.cache-primary-key }}
 
-    - if: ${{ steps.bootstrap-cerbero.outcome == 'success' && ! steps.restore-cerbero-deps-cache.outputs.cache-hit }}
+    - if: ${{ inputs.no-cache != 'true' && steps.cerbero-build.outcome == 'success' && ! steps.restore-cerbero-deps-cache.outputs.cache-hit }}
       uses: actions/cache/save@v4
       with:
         path: ${{ steps.cerbero-config.outputs.cerbero-home }}/cerbero-deps.tar.xz
