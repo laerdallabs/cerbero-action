@@ -221,7 +221,7 @@ runs:
         LOG_PATH: ${{ steps.cerbero-config.outputs.full-log-path }}
         FETCH_ARGS: --jobs=4
       run: |
-        # Bootstrap Cerbero Log
+        # Bootstrap Cerbero
         mkdir -p "${LOG_PATH}"
 
         group_cmd () {
