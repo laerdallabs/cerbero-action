@@ -20,10 +20,6 @@ inputs:
     description: 'Additional args to pass to Cerbero package'
     required: false
     default: ''
-  bootstrap-system:
-    description: 'Bootstrap the system before building'
-    required: false
-    default: 'true'
   cleanup:
     description: 'Whether to clean the Cerbero build directory'
     required: false
@@ -51,14 +47,23 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: Python >= 3.10
+      uses: actions/setup-python@v5
+      with:
+        # cerbero requires >=3.10
+        python-version: '>=3.10'
 
-    - id: setup-msys2
-      if: runner.os == 'Windows'
+    - if: runner.os == 'Windows'
+      name: Setup MSYS2
       uses: msys2/setup-msys2@v2
       with:
-        msystem: UCRT64
+        # release = false: use existing installation
+        # path-type: cerbero requires 'inherit' path type
+        # tie 'cache' to the input arg
+        release:   false
+        msystem:   UCRT64
         path-type: inherit
-        cache: ${{ inputs.no-cache != 'true' }}
+        cache:     ${{ inputs.no-cache != 'true' }}
         install: >-
           mingw-w64-ucrt-x86_64-jq
           m4
@@ -68,21 +73,47 @@ runs:
           mingw-w64-ucrt-x86_64-diffutils
           flex
           mingw-w64-ucrt-x86_64-gperf
-          mingw-w64-ucrt-x86_64-make
+          mingw-w64-ucrt-x86_64-autotools
           mingw-w64-ucrt-x86_64-ninja
           mingw-w64-ucrt-x86_64-perl
 
     - if: runner.os == 'Windows'
+      name: Enable long file paths
+      shell: powershell
+      run: |
+        New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force
+
+    - if: runner.os == 'Windows'
+      # These are seen in the cerbero-uninstalled.ps1 script as a CLI arg
+      name: Set Extra MSYS2 flags for UCRT64 Environment
+      shell: powershell
+      run: |
+        Add-Content "C:\msys64\ucrt64.ini" "`nCHERE_INVOKING=1"
+        Add-Content "C:\msys64\ucrt64.ini" "`nMSYS2_NOSTART=yes"
+        Add-Content "C:\msys64\ucrt64.ini" "`nMSYS=winsymlinks:nativestrict"
+
+    - if: runner.os == 'Windows'
+      name: Set Git 'core.autocrlf = false'
       shell: msys2 -eo pipefail {0}
       run: git config --global core.autocrlf false
 
-    - id: get-cerbero
+    - name: Clone Cerbero
       shell: ${{ runner.os == 'Windows'  && 'msys2 -eo pipefail {0}' || 'bash' }}
-      name: Get Cerbero
       run: |
         git clone --depth=1 --branch ${{ inputs.cerbero-ref }} ${{ inputs.cerbero-repo }} cerbero
 
+    - name: Run Bootstrap
+      shell: ${{ runner.os == 'Windows'  && 'msys2 -eo pipefail {0}' || 'bash' }}
+      working-directory: cerbero
+      run: |
+        if [ "${{ runner.os }}" == "Windows" ]; then
+          powershell.exe ./tools/bootstrap-windows.ps1
+        else
+          ./tools/bootstrap-debian.sh
+        fi
+
     - id: version-info
+      name: Gather Version Information
       shell: ${{ runner.os == 'Windows'  && 'msys2 -eo pipefail {0}' || 'bash' }}
       working-directory: cerbero
       env:
@@ -98,29 +129,8 @@ runs:
         echo "runtime-msi-filename=gstreamer-1.0-msvc-x86_64-${gstreamer_version}-${cerbero_short_sha}.msi" | tee -a $GITHUB_OUTPUT
         echo "dev-msi-filename=gstreamer-1.0-devel-msvc-x86_64-${gstreamer_version}-${cerbero_short_sha}.msi" | tee -a $GITHUB_OUTPUT
 
-    - if: ${{inputs.bootstrap-system == 'true' && runner.os == 'Windows' }}
-      name: Bootstrap Windows
-      shell: powershell
-      working-directory: cerbero
-      run: |
-        # Bootstrap Windows
-        ./tools/bootstrap-windows.ps1
-
-    - if: ${{inputs.bootstrap-system == 'true' && runner.os == 'Linux' }}
-      name: Bootstrap Linux
-      shell: bash
-      working-directory: cerbero
-      run: |
-        # Bootstrap Linux
-        sudo apt-get update
-        sudo apt-get -y install --no-install-recommends \
-          sudo \
-          git \
-          python3 \
-          locales \
-          vim
-
     - id: cerbero-config
+      name: Configure Cerbero Build
       working-directory: cerbero
       shell: ${{ runner.os == 'Windows'  && 'msys2 -eo pipefail {0}' || 'bash' }}
       env:
@@ -203,7 +213,7 @@ runs:
         ls -l '${{ steps.cerbero-config.outputs.cerbero-home }}'
         echo "::endgroup::"
 
-    - id: bootstrap-cerbero
+    - id: build-gstreamer-deps
       working-directory: cerbero
       shell: ${{ runner.os == 'Windows'  && 'msys2 -eo pipefail {0}' || 'bash' }}
       env:
@@ -211,7 +221,7 @@ runs:
         LOG_PATH: ${{ steps.cerbero-config.outputs.full-log-path }}
         FETCH_ARGS: --jobs=4
       run: |
-        # Bootstrap Cerbero
+        # Build Cerbero Deps
         mkdir -p "${LOG_PATH}"
 
         group_cmd () {
@@ -240,13 +250,13 @@ runs:
         group_cmd "$CERBERO $CERBERO_ARGS build --offline $more_deps" | tee -a "${LOG_PATH}/3_build-deps.log"
         group_cmd "$CERBERO $CERBERO_ARGS gen-cache" | tee "${LOG_PATH}/4_cache.log"
 
-    - if: ${{ steps.bootstrap-cerbero.outcome == 'success' && ! steps.restore-cerbero-sources-cache.outputs.cache-hit }}
+    - if: ${{ inputs.no-cache != 'true' && steps.build-gstreamer-deps.outcome == 'success' && ! steps.restore-cerbero-sources-cache.outputs.cache-hit }}
       uses: actions/cache/save@v4
       with:
         path: ${{ steps.cerbero-config.outputs.cerbero-sources }}
         key: ${{ steps.restore-cerbero-sources-cache.outputs.cache-primary-key }}
 
-    - if: ${{ steps.bootstrap-cerbero.outcome == 'success' && ! steps.restore-cerbero-deps-cache.outputs.cache-hit }}
+    - if: ${{ inputs.no-cache != 'true' && steps.build-gstreamer-deps.outcome == 'success' && ! steps.restore-cerbero-deps-cache.outputs.cache-hit }}
       uses: actions/cache/save@v4
       with:
         path: ${{ steps.cerbero-config.outputs.cerbero-home }}/cerbero-deps.tar.xz
@@ -294,7 +304,9 @@ runs:
         name: cerbero-logs
         path: ${{ steps.cerbero-config.outputs.cerbero-home }}/logs
 
-    - name: Cleanup Cerbero
-      if: ${{ always() && inputs.cleanup == 'true' && steps.get-cerbero.outcome != 'skipped' }}
-      shell: ${{ runner.os == 'Windows'  && 'msys2 -eo pipefail {0}' || 'bash' }}
-      run: rm -rf "cerbero"
+    - name: Upload builddir on build failure
+      uses: actions/upload-artifact@v4
+      if: ${{ always() && steps.build-packages.outcome != 'success' }}
+      with:
+        name: build-gstreamer-deps
+        path: ${{ steps.cerbero-config.outputs.cerbero-home }}

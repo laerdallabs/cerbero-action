@@ -11,11 +11,6 @@ on:
         description: 'Ref to use for Cerbero'
         required: false
         default: fixes-for-cerbero-action
-      bootstrap-system:
-        description: 'Bootstrap the system before building'
-        required: false
-        type: boolean
-        default: true
       no-cache:
         description: 'Do not use cache when building'
         required: false
@@ -38,4 +33,3 @@ jobs:
           cerbero-repo: ${{ inputs.cerbero-repo }}
           cerbero-ref: ${{ inputs.cerbero-ref }}
           no-cache: ${{ inputs.no-cache == true }}
-          bootstrap-system: ${{ inputs.bootstrap-system }}
