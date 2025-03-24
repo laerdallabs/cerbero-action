@@ -213,7 +213,7 @@ runs:
         ls -l '${{ steps.cerbero-config.outputs.cerbero-home }}'
         echo "::endgroup::"
 
-    - id: cerbero-build
+    - id: build-gstreamer-deps
       working-directory: cerbero
       shell: ${{ runner.os == 'Windows'  && 'msys2 -eo pipefail {0}' || 'bash' }}
       env:
@@ -221,7 +221,7 @@ runs:
         LOG_PATH: ${{ steps.cerbero-config.outputs.full-log-path }}
         FETCH_ARGS: --jobs=4
       run: |
-        # Bootstrap Cerbero
+        # Build Cerbero Deps
         mkdir -p "${LOG_PATH}"
 
         group_cmd () {
@@ -250,13 +250,13 @@ runs:
         group_cmd "$CERBERO $CERBERO_ARGS build --offline $more_deps" | tee -a "${LOG_PATH}/3_build-deps.log"
         group_cmd "$CERBERO $CERBERO_ARGS gen-cache" | tee "${LOG_PATH}/4_cache.log"
 
-    - if: ${{ inputs.no-cache != 'true' && steps.cerbero-build.outcome == 'success' && ! steps.restore-cerbero-sources-cache.outputs.cache-hit }}
+    - if: ${{ inputs.no-cache != 'true' && steps.build-gstreamer-deps.outcome == 'success' && ! steps.restore-cerbero-sources-cache.outputs.cache-hit }}
       uses: actions/cache/save@v4
       with:
         path: ${{ steps.cerbero-config.outputs.cerbero-sources }}
         key: ${{ steps.restore-cerbero-sources-cache.outputs.cache-primary-key }}
 
-    - if: ${{ inputs.no-cache != 'true' && steps.cerbero-build.outcome == 'success' && ! steps.restore-cerbero-deps-cache.outputs.cache-hit }}
+    - if: ${{ inputs.no-cache != 'true' && steps.build-gstreamer-deps.outcome == 'success' && ! steps.restore-cerbero-deps-cache.outputs.cache-hit }}
       uses: actions/cache/save@v4
       with:
         path: ${{ steps.cerbero-config.outputs.cerbero-home }}/cerbero-deps.tar.xz
@@ -308,5 +308,5 @@ runs:
       uses: actions/upload-artifact@v4
       if: ${{ always() && steps.build-packages.outcome != 'success' }}
       with:
-        name: cerbero-build
+        name: build-gstreamer-deps
         path: ${{ steps.cerbero-config.outputs.cerbero-home }}
