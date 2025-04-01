@@ -32,4 +32,6 @@ jobs:
         with:
           cerbero-repo: ${{ inputs.cerbero-repo }}
           cerbero-ref: ${{ inputs.cerbero-ref }}
+          cerbero-args: '--clocktime --timestamps -v visualstudio'
+          config: 'win64.cbc'
           no-cache: ${{ inputs.no-cache == true }}
