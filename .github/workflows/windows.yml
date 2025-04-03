@@ -35,3 +35,4 @@ jobs:
           cerbero-args: '--clocktime --timestamps -v visualstudio'
           config: 'win64.cbc'
           no-cache: ${{ inputs.no-cache == true }}
+          cerbero-action-ref: ${{ github.ref }}

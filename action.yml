@@ -1,5 +1,5 @@
 name: Setup GStreamer
-description: Installs GStreamer by either building via Cerbero or downloading the installer.
+description: Setup GStreamer by either downloading or building via Cerbero.
 inputs:
   cerbero-repo:
     description: 'Repository to use for Cerbero'
@@ -20,6 +20,10 @@ inputs:
     description: 'Additional args to pass to Cerbero package'
     required: false
     default: ''
+  cerbero-action-ref:
+    description: 'Branch/tag/ref to use for cloning cerbero-action'
+    required: false
+    default: main
   cleanup:
     description: 'Whether to clean the Cerbero build directory'
     required: false
@@ -58,12 +62,13 @@ runs:
       # the 'uses' will resolve to the actions contained in this repo.
       with:
         repository: laerdallabs/cerbero-action
-        path: .cerbero-action
+        ref: ${{ inputs.cerbero-action-ref }}
+        path: .ca
         fetch-depth: 1
 
     - name: Run Setup Action
       id: setup-action
-      uses: ./.cerbero-action/.github/actions/setup
+      uses: ./.ca/.github/actions/setup
       with:
         cerbero-repo: ${{ inputs.cerbero-repo }}
         cerbero-ref: ${{ inputs.cerbero-ref }}
@@ -76,3 +81,8 @@ runs:
         s3-upload-path: ${{ inputs.s3-upload-path }}
         gst-plugins-rs-repo: ${{ inputs.gst-plugins-rs-repo }}
         gst-plugins-rs-ref: ${{ inputs.gst-plugins-rs-ref }}
+
+    - name: Cleanup Cerbero
+      if: ${{ always() && inputs.cleanup == 'true' }}
+      shell: ${{ runner.os == 'Windows'  && 'msys2 -eo pipefail {0}' || 'bash' }}
+      run: rm -rf cerbero

@@ -179,7 +179,7 @@ runs:
     - id: build-packages
       if: ${{ !steps.check-installer-exists.outputs.runtime-path || !steps.check-installer-exists.outputs.dev-path }}
       name: Build GStreamer with Cerbero
-      uses: ./.cerbero-action/.github/actions/build
+      uses: ./.ca/.github/actions/build
       with:
         config: ${{ inputs.config }}
         cerbero-args: ${{ inputs.cerbero-args }}
@@ -224,12 +224,7 @@ runs:
 
     - id: install
       name: Install GStreamer
-      uses: ./.cerbero-action/.github/actions/install
+      uses: ./.ca/.github/actions/install
       with:
         runtime-installer-path: ${{ steps.select-path.outputs.runtime-installer-path }}
         development-installer-path: ${{ steps.select-path.outputs.development-installer-path }}
-
-    - name: Cleanup Cerbero
-      if: ${{ always() && inputs.cleanup == 'true' && steps.get-cerbero.outcome != 'skipped'}}
-      shell: ${{ runner.os == 'Windows'  && 'msys2 -eo pipefail {0}' || 'bash' }}
-      run: rm -rf cerbero
